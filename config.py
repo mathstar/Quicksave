@@ -83,8 +83,15 @@ class Config:
 
         return None
 
-    def add_game(self, name: str, save_dir: str, backup_dir: str, alias: Optional[str] = None) -> None:
-        """Register a new game."""
+    def add_game(self, name: str, save_dir: str, backup_dir: str, aliases: Optional[list] = None) -> None:
+        """Register a new game.
+
+        Args:
+            name: Name of the game
+            save_dir: Path to the save directory
+            backup_dir: Path to the backup directory
+            aliases: Optional list of aliases for the game
+        """
         if "games" not in self.config:
             self.config["games"] = {}
 
@@ -94,8 +101,8 @@ class Config:
             "aliases": []
         }
 
-        if alias:
-            self.config["games"][name]["aliases"] = [alias]
+        if aliases and isinstance(aliases, list):
+            self.config["games"][name]["aliases"] = aliases
 
         self.save()
 

@@ -18,7 +18,7 @@ register_parser = subparsers.add_parser('register', help='Register a new game sa
 register_parser.add_argument('-n', '--name', required=True, help='Name of the game')
 register_parser.add_argument('-s', '--save-dir', required=True, help='Path to the save directory')
 register_parser.add_argument('-b', '--backup-dir', required=True, help='Path to the backup directory')
-register_parser.add_argument('-a', '--alias', help='Optional alias for the game')
+register_parser.add_argument('-a', '--alias', action='append', help='Alias for the game, can be used multiple times')
 
 # Save command
 save_parser = subparsers.add_parser('save', help='Save a snapshot of the registered game save')
@@ -69,7 +69,7 @@ def main():
             print(f"Save directory: {save_dir}")
             print(f"Backup directory: {backup_dir}")
             if args.alias:
-                print(f"Alias: {args.alias}")
+                print(f"Aliases: {', '.join(args.alias)}")
 
         elif args.command == 'save':
             # Get game info
