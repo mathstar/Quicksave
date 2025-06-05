@@ -25,6 +25,7 @@ register_parser.add_argument('-a', '--alias', action='append', help='Alias for t
 save_parser = subparsers.add_parser('save', help='Save a snapshot of the registered game save')
 save_parser.add_argument('game', help='Name or alias of the game to save')
 save_parser.add_argument('-t', '--tag', help='Optional tag to add to the snapshot name')
+save_parser.add_argument('-b', '--backup-dir', help='Override the backup directory for this snapshot')
 
 # List command
 list_parser = subparsers.add_parser('list', help='List all registered games')
@@ -32,6 +33,7 @@ list_parser = subparsers.add_parser('list', help='List all registered games')
 # Show command
 show_parser = subparsers.add_parser('show', help='List saved snapshots for a game')
 show_parser.add_argument('game', help='Name or alias of the game to show snapshots for')
+show_parser.add_argument('-b', '--backup-dir', help='Override the backup directory for listing snapshots')
 
 def main():
     # Parse command line arguments
@@ -80,7 +82,7 @@ def main():
 
             # Extract directories from game info
             save_dir = game_info.get("save_dir")
-            backup_dir = game_info.get("backup_dir")
+            backup_dir = args.backup_dir if args.backup_dir else game_info.get("backup_dir")
 
             # Make sure save directory exists
             if not os.path.exists(save_dir):
@@ -129,7 +131,7 @@ def main():
 
             # Extract directories from game info
             save_dir = game_info.get("save_dir")
-            backup_dir = game_info.get("backup_dir")
+            backup_dir = args.backup_dir if args.backup_dir else game_info.get("backup_dir")
             source_name = os.path.basename(save_dir)
 
             # Get list of snapshots
