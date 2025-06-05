@@ -3,6 +3,7 @@ from config import Config
 from backup_manager import BackupManager
 import os
 import datetime
+import copy
 
 argument_parser = ArgumentParser(
     prog="quicksave",
@@ -27,6 +28,7 @@ update_parser.add_argument('game', help='Name or alias of the game to update')
 update_parser.add_argument('-s', '--save-dir', help='New path to the save directory')
 update_parser.add_argument('-b', '--backup-dir', help='New path to the backup directory')
 update_parser.add_argument('-a', '--alias', action='append', help='Aliases to add (can be used multiple times)')
+update_parser.add_argument('-r', '--remove-alias', action='append', help='Aliases to remove (can be used multiple times)')
 
 # Unregister command
 unregister_parser = subparsers.add_parser('unregister', help='Remove a game from configuration')
@@ -78,19 +80,29 @@ def main():
                 return
 
             # Register the game
-            config.add_game(args.name, save_dir, backup_dir, args.alias)
+            success, valid_aliases, rejected_aliases = config.add_game(args.name, save_dir, backup_dir, args.alias)
+
+            if not success:
+                print(f"Error: Game name '{args.name}' is already in use as a game name or alias.")
+                return
+
             print(f"Registered game: {args.name}")
             print(f"Save directory: {save_dir}")
             print(f"Backup directory: {backup_dir}")
-            if args.alias:
-                print(f"Aliases: {', '.join(args.alias)}")
+            if valid_aliases:
+                print(f"Aliases: {', '.join(valid_aliases)}")
+            if rejected_aliases:
+                print(f"Warning: The following aliases were rejected because they're already in use: {', '.join(rejected_aliases)}")
 
         elif args.command == 'update':
             # Get game info
-            game_info = config.get_game(args.game)
-            if not game_info:
+            original_game_info = config.get_game(args.game)
+            if not original_game_info:
                 print(f"Error: Game '{args.game}' not found.")
                 return
+
+            # Create a deep copy to avoid modifying the original object
+            game_info = copy.deepcopy(original_game_info)
 
             # Update save directory if provided
             if args.save_dir:
@@ -106,21 +118,24 @@ def main():
                 game_info["backup_dir"] = backup_dir
 
             # Update aliases if provided
-            if args.alias:
-                aliases = game_info.get("aliases", [])
-                aliases.extend(args.alias)
-                game_info["aliases"] = aliases
+            if args.alias or args.remove_alias:
+                success, actual_name, valid_aliases, rejected_aliases = config.update_game(args.game, game_info, args.alias, args.remove_alias)
+            else:
+                # No new aliases to add or remove
+                success, actual_name, valid_aliases, rejected_aliases = config.update_game(args.game, game_info)
 
-            # Save updated game info
-            success = config.update_game(args.game, game_info)
             if success:
-                print(f"Updated game: {args.game}")
+                print(f"Updated game: {actual_name}")
                 if args.save_dir:
                     print(f"New save directory: {save_dir}")
                 if args.backup_dir:
                     print(f"New backup directory: {backup_dir}")
-                if args.alias:
-                    print(f"Added aliases: {', '.join(args.alias)}")
+                if valid_aliases:
+                    print(f"Added aliases: {', '.join(valid_aliases)}")
+                if rejected_aliases:
+                    print(f"Warning: The following aliases were rejected because they're already in use: {', '.join(rejected_aliases)}")
+                if args.remove_alias:
+                    print(f"Removed aliases: {', '.join(args.remove_alias)}")
             else:
                 print(f"Error: Failed to update game '{args.game}'.")
 
