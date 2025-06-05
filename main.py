@@ -21,6 +21,13 @@ register_parser.add_argument('-s', '--save-dir', required=True, help='Path to th
 register_parser.add_argument('-b', '--backup-dir', required=True, help='Path to the backup directory')
 register_parser.add_argument('-a', '--alias', action='append', help='Alias for the game, can be used multiple times')
 
+# Update command
+update_parser = subparsers.add_parser('update', help='Update an existing game configuration')
+update_parser.add_argument('-n', '--name', required=True, help='Name of the game to update')
+update_parser.add_argument('-s', '--save-dir', help='New path to the save directory')
+update_parser.add_argument('-b', '--backup-dir', help='New path to the backup directory')
+update_parser.add_argument('-a', '--alias', action='append', help='Aliases to add (can be used multiple times)')
+
 # Save command
 save_parser = subparsers.add_parser('save', help='Save a snapshot of the registered game save')
 save_parser.add_argument('game', help='Name or alias of the game to save')
@@ -29,6 +36,7 @@ save_parser.add_argument('-b', '--backup-dir', help='Override the backup directo
 
 # List command
 list_parser = subparsers.add_parser('list', help='List all registered games')
+list_parser.add_argument('-v', '--verbose', action='store_true', help='Show detailed information including save and backup directories')
 
 # Show command
 show_parser = subparsers.add_parser('show', help='List saved snapshots for a game')
@@ -72,6 +80,42 @@ def main():
             print(f"Backup directory: {backup_dir}")
             if args.alias:
                 print(f"Aliases: {', '.join(args.alias)}")
+
+        elif args.command == 'update':
+            # Get game info
+            game_info = config.get_game(args.name)
+            if not game_info:
+                print(f"Error: Game '{args.name}' not found.")
+                return
+
+            # Update save directory if provided
+            if args.save_dir:
+                save_dir = os.path.abspath(args.save_dir)
+                game_info["save_dir"] = save_dir
+
+            # Update backup directory if provided
+            if args.backup_dir:
+                if args.backup_dir.startswith('s3://'):
+                    backup_dir = args.backup_dir
+                else:
+                    backup_dir = os.path.abspath(args.backup_dir)
+                game_info["backup_dir"] = backup_dir
+
+            # Update aliases if provided
+            if args.alias:
+                aliases = game_info.get("aliases", [])
+                aliases.extend(args.alias)
+                game_info["aliases"] = aliases
+
+            # Save updated game info
+            config.update_game(args.name, game_info)
+            print(f"Updated game: {args.name}")
+            if args.save_dir:
+                print(f"New save directory: {save_dir}")
+            if args.backup_dir:
+                print(f"New backup directory: {backup_dir}")
+            if args.alias:
+                print(f"Updated aliases: {', '.join(args.alias)}")
 
         elif args.command == 'save':
             # Get game info
@@ -121,6 +165,11 @@ def main():
                     print(f"- {name} (aliases: {alias_str})")
                 else:
                     print(f"- {name}")
+                if args.verbose:
+                    save_dir = game_info.get("save_dir", "N/A")
+                    backup_dir = game_info.get("backup_dir", "N/A")
+                    print(f"  Save directory: {save_dir}")
+                    print(f"  Backup directory: {backup_dir}")
 
         elif args.command == 'show':
             # Get game info

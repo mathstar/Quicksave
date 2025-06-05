@@ -128,3 +128,21 @@ class Config:
             self.save()
 
         return True
+
+    def update_game(self, name: str, game_info: dict) -> None:
+        """Update an existing game's configuration.
+
+        Args:
+            name: Name of the game to update
+            game_info: Updated game information dictionary
+        """
+        if "games" not in self.config:
+            self.config["games"] = {}
+
+        if name not in self.config["games"]:
+            raise ValueError(f"Game '{name}' not found in configuration")
+
+        # Update the game configuration
+        self.config["games"][name] = game_info
+        self.save()
+
