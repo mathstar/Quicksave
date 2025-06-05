@@ -30,9 +30,9 @@ update_parser.add_argument('-b', '--backup-dir', help='New path to the backup di
 update_parser.add_argument('-a', '--alias', action='append', help='Aliases to add (can be used multiple times)')
 update_parser.add_argument('-r', '--remove-alias', action='append', help='Aliases to remove (can be used multiple times)')
 
-# Unregister command
-unregister_parser = subparsers.add_parser('unregister', help='Remove a game from configuration')
-unregister_parser.add_argument('game', help='Name of the game to unregister')
+# Deregister command
+deregister_parser = subparsers.add_parser('deregister', help='Remove a game from configuration')
+deregister_parser.add_argument('game', help='Name of the game to deregister')
 
 # Save command
 save_parser = subparsers.add_parser('save', help='Save a snapshot of the registered game save')
@@ -139,11 +139,11 @@ def main():
             else:
                 print(f"Error: Failed to update game '{args.game}'.")
 
-        elif args.command == 'unregister':
+        elif args.command == 'deregister':
             # Remove game configuration
             success = config.remove_game(args.game)
             if success:
-                print(f"Unregistered game: {args.game}")
+                print(f"Deregistered game: {args.game}")
             else:
                 print(f"Error: Game '{args.game}' not found.")
 
