@@ -54,6 +54,34 @@ class BackupManager:
 
         return bucket_name, key_prefix
 
+    def _cleanup_temp_files(self, temp_file_path: str) -> None:
+        """Clean up temporary files and directories after a successful upload.
+
+        Args:
+            temp_file_path: Path to the temporary file to remove
+        """
+        # Get the directory containing the temp file
+        temp_dir = os.path.dirname(temp_file_path)
+
+        # Delete the temporary file
+        try:
+            os.remove(temp_file_path)
+            print(f"Removed temporary local file: {temp_file_path}")
+        except OSError as e:
+            print(f"Warning: Could not remove temporary file {temp_file_path}: {e}")
+            return
+
+        # Check if the directory is empty, and if so, delete it
+        try:
+            # List all files in the directory (excluding . and ..)
+            remaining_files = [f for f in os.listdir(temp_dir) if not f.startswith('.')]
+
+            if not remaining_files:
+                os.rmdir(temp_dir)
+                print(f"Removed empty temporary directory: {temp_dir}")
+        except OSError as e:
+            print(f"Warning: Could not remove temporary directory {temp_dir}: {e}")
+
     def create_backup(self, source_dir: str, backup_dir: str, snapshot_name: str) -> str:
         """Create a zip backup of the source directory.
 
@@ -107,8 +135,10 @@ class BackupManager:
                     Callback=UploadProgressPercentage(temp_backup_path)
                 )
                 print(f"Upload complete!")
-                # Optionally delete the temp file after successful upload
-                # os.remove(temp_backup_path)
+
+                # Clean up temporary files after successful upload
+                self._cleanup_temp_files(temp_backup_path)
+
                 return s3_path
             except botocore.exceptions.ClientError as e:
                 print(f"Error uploading to S3: {e}")
@@ -286,4 +316,3 @@ class UploadProgressPercentage:
         if percentage >= self._last_percentage + 10:
             print(f"Upload progress: {percentage}%")
             self._last_percentage = percentage
-
