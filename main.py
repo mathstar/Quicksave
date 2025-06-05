@@ -17,7 +17,7 @@ subparsers = argument_parser.add_subparsers(dest='command', help='Commands')
 
 # Register command
 register_parser = subparsers.add_parser('register', help='Register a new game save directory')
-register_parser.add_argument('-n', '--name', required=True, help='Name of the game')
+register_parser.add_argument('game', help='Name of the game')
 register_parser.add_argument('-s', '--save-dir', required=True, help='Path to the save directory')
 register_parser.add_argument('-b', '--backup-dir', required=True, help='Path to the backup directory')
 register_parser.add_argument('-a', '--alias', action='append', help='Alias for the game, can be used multiple times')
@@ -80,13 +80,13 @@ def main():
                 return
 
             # Register the game
-            success, valid_aliases, rejected_aliases = config.add_game(args.name, save_dir, backup_dir, args.alias)
+            success, valid_aliases, rejected_aliases = config.add_game(args.game, save_dir, backup_dir, args.alias)
 
             if not success:
-                print(f"Error: Game name '{args.name}' is already in use as a game name or alias.")
+                print(f"Error: Game name '{args.game}' is already in use as a game name or alias.")
                 return
 
-            print(f"Registered game: {args.name}")
+            print(f"Registered game: {args.game}")
             print(f"Save directory: {save_dir}")
             print(f"Backup directory: {backup_dir}")
             if valid_aliases:
