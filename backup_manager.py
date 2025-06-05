@@ -1,6 +1,8 @@
 import os
 import zipfile
 import pathlib
+import boto3
+import botocore.exceptions
 from typing import List, Tuple, Optional
 
 class BackupManager:
@@ -13,6 +15,14 @@ class BackupManager:
             config: Configuration settings for backup operations
         """
         self.config = config or {}
+        self._s3_client = None
+
+    @property
+    def s3_client(self):
+        """Lazy-load S3 client when needed."""
+        if self._s3_client is None:
+            self._s3_client = boto3.client('s3')
+        return self._s3_client
 
     def is_s3_path(self, path: str) -> bool:
         """Check if a path is an S3 URL.
@@ -62,31 +72,55 @@ class BackupManager:
         backup_filename = f"{source_name}_{snapshot_name}.zip"
 
         if self.is_s3_path(backup_dir):
-            # Handle S3 backup (placeholder for now)
-            print("Note: S3 backup support is not yet fully implemented")
+            # Handle S3 backup
             # Create a temporary backup in the parent directory of source_dir
             source_parent = os.path.dirname(source_dir)
             temp_dir = os.path.join(source_parent, "temp_backups")
             if not os.path.exists(temp_dir):
                 os.makedirs(temp_dir)
-            backup_path = os.path.join(temp_dir, backup_filename)
+            temp_backup_path = os.path.join(temp_dir, backup_filename)
+
+            # Extract S3 bucket and key
+            bucket_name, key_prefix = self.parse_s3_path(backup_dir)
+            # Add trailing slash to key prefix if not present and not empty
+            if key_prefix and not key_prefix.endswith('/'):
+                key_prefix += '/'
+            s3_key = f"{key_prefix}{backup_filename}"
             s3_path = f"{backup_dir}/{backup_filename}"
 
             # Create the zip locally
-            with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            print(f"Creating backup archive...")
+            with zipfile.ZipFile(temp_backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(source_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
                         rel_path = os.path.relpath(file_path, source_dir)
                         zipf.write(file_path, rel_path)
 
-            print(f"Would upload {backup_path} to {s3_path}")
-            return s3_path
+            # Upload to S3
+            print(f"Uploading to S3 bucket '{bucket_name}'...")
+            try:
+                self.s3_client.upload_file(
+                    temp_backup_path,
+                    bucket_name,
+                    s3_key,
+                    Callback=UploadProgressPercentage(temp_backup_path)
+                )
+                print(f"Upload complete!")
+                # Optionally delete the temp file after successful upload
+                # os.remove(temp_backup_path)
+                return s3_path
+            except botocore.exceptions.ClientError as e:
+                print(f"Error uploading to S3: {e}")
+                # Return local path if upload fails
+                print(f"Backup saved locally to: {temp_backup_path}")
+                return temp_backup_path
         else:
             # Local backup path
             backup_path = os.path.join(backup_dir, backup_filename)
 
             # Create a zip file
+            print(f"Creating backup archive...")
             with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 # Walk through all files in the source directory
                 for root, _, files in os.walk(source_dir):
@@ -98,6 +132,38 @@ class BackupManager:
                         zipf.write(file_path, rel_path)
 
             return backup_path
+
+    def _parse_snapshot_filename(self, filename: str, prefix: str) -> Optional[Tuple[str, str, Optional[str]]]:
+        """Parse a snapshot filename to extract timestamp and tag information.
+
+        Args:
+            filename: Name of the snapshot file
+            prefix: Expected filename prefix (usually the game directory name followed by _)
+
+        Returns:
+            tuple: (filename, timestamp, tag) if valid, None otherwise
+        """
+        if not (filename.startswith(prefix) and filename.endswith('.zip')):
+            return None
+
+        # Remove prefix and .zip extension
+        name_part = filename[len(prefix):-4]
+
+        # Split by underscore to find components
+        parts = name_part.split('_')
+
+        if len(parts) >= 2:  # At minimum we need date and time parts
+            # Timestamp is the first two parts joined with an underscore
+            timestamp = f"{parts[0]}_{parts[1]}"
+
+            # Anything remaining after is the tag (if present)
+            tag = None
+            if len(parts) > 2:
+                tag = "_".join(parts[2:])
+
+            return (filename, timestamp, tag)
+
+        return None
 
     def list_snapshots(self, backup_dir: str, source_name: str) -> List[Tuple[str, str, Optional[str]]]:
         """List all snapshots for a specific game.
@@ -113,31 +179,47 @@ class BackupManager:
         prefix = f"{source_name}_"
 
         if self.is_s3_path(backup_dir):
-            # Placeholder for S3 snapshot listing
-            print("Note: S3 snapshot listing is not yet fully implemented")
-            return snapshots
+            # Handle S3 listing
+            bucket_name, key_prefix = self.parse_s3_path(backup_dir)
 
-        if not os.path.exists(backup_dir):
-            return snapshots
+            # Add trailing slash to key prefix if not present and not empty
+            if key_prefix and not key_prefix.endswith('/'):
+                key_prefix += '/'
 
-        for file in os.listdir(backup_dir):
-            if file.startswith(prefix) and file.endswith(".zip"):
-                # Remove prefix and .zip extension
-                name_part = file[len(prefix):-4]
+            # Prepare the S3 prefix to search for
+            s3_prefix = f"{key_prefix}{source_name}_"
 
-                # Split by underscore to find components
-                parts = name_part.split('_')
+            try:
+                # List objects in the bucket with the given prefix
+                response = self.s3_client.list_objects_v2(
+                    Bucket=bucket_name,
+                    Prefix=s3_prefix
+                )
 
-                if len(parts) >= 2:  # At minimum we need date and time parts
-                    # Timestamp is the first two parts joined with an underscore
-                    timestamp = f"{parts[0]}_{parts[1]}"
+                # Process the response if objects were found
+                if 'Contents' in response:
+                    for obj in response['Contents']:
+                        key = obj['Key']
+                        # Extract just the filename from the full key
+                        filename = os.path.basename(key)
 
-                    # Anything remaining after is the tag (if present)
-                    tag = None
-                    if len(parts) > 2:
-                        tag = "_".join(parts[2:])
+                        # Use the helper to parse the filename
+                        parsed = self._parse_snapshot_filename(filename, prefix)
+                        if parsed:
+                            snapshots.append(parsed)
+            except botocore.exceptions.ClientError as e:
+                print(f"Error listing S3 objects: {e}")
+                return snapshots
+        else:
+            # Local directory listing
+            if not os.path.exists(backup_dir):
+                return snapshots
 
-                    snapshots.append((file, timestamp, tag))
+            for file in os.listdir(backup_dir):
+                # Use the helper to parse the filename
+                parsed = self._parse_snapshot_filename(file, prefix)
+                if parsed:
+                    snapshots.append(parsed)
 
         # Sort by timestamp (newest first)
         return sorted(snapshots, key=lambda x: x[1], reverse=True)
@@ -162,10 +244,21 @@ class BackupManager:
             if not bucket_name:
                 return False, "Invalid S3 URL format. Expected: s3://bucket-name/optional/path"
 
-            # For now, we just validate the format and accept it
-            # In a full implementation, you'd verify bucket existence and permissions
-            print(f"Note: S3 backup location '{bucket_name}/{key_prefix}' will be used (validation skipped)")
-            return True, None
+            # Verify the bucket exists and is accessible
+            try:
+                self.s3_client.head_bucket(Bucket=bucket_name)
+                print(f"S3 bucket '{bucket_name}' is accessible.")
+                return True, None
+            except botocore.exceptions.ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code')
+                if error_code == '404':
+                    return False, f"S3 bucket '{bucket_name}' does not exist."
+                elif error_code == '403':
+                    return False, f"No permission to access S3 bucket '{bucket_name}'."
+                else:
+                    return False, f"Error accessing S3 bucket '{bucket_name}': {e}"
+            except Exception as e:
+                return False, f"Error connecting to S3: {e}"
 
         # Create local backup directory if it doesn't exist
         if not os.path.exists(backup_dir):
@@ -175,3 +268,22 @@ class BackupManager:
                 return False, f"Error creating backup directory: {e}"
 
         return True, None
+
+
+# Helper class for S3 upload progress
+class UploadProgressPercentage:
+    def __init__(self, filename):
+        self._filename = filename
+        self._size = float(os.path.getsize(filename))
+        self._seen_so_far = 0
+        self._last_percentage = 0
+
+    def __call__(self, bytes_amount):
+        self._seen_so_far += bytes_amount
+        percentage = int((self._seen_so_far / self._size) * 100)
+
+        # Only print when percentage changes by at least 10%
+        if percentage >= self._last_percentage + 10:
+            print(f"Upload progress: {percentage}%")
+            self._last_percentage = percentage
+
