@@ -14,6 +14,36 @@ class BackupManager:
         """
         self.config = config or {}
 
+    def is_s3_path(self, path: str) -> bool:
+        """Check if a path is an S3 URL.
+
+        Args:
+            path: Path to check
+
+        Returns:
+            bool: True if path is an S3 URL
+        """
+        return path.startswith('s3://')
+
+    def parse_s3_path(self, s3_path: str) -> Tuple[str, str]:
+        """Parse an S3 path into bucket and key.
+
+        Args:
+            s3_path: S3 path in the format s3://bucket-name/key/path
+
+        Returns:
+            tuple: (bucket_name, key_prefix)
+        """
+        # Remove the s3:// prefix
+        path_without_scheme = s3_path[5:]
+
+        # Split into bucket and key
+        parts = path_without_scheme.split('/', 1)
+        bucket_name = parts[0]
+        key_prefix = parts[1] if len(parts) > 1 else ""
+
+        return bucket_name, key_prefix
+
     def create_backup(self, source_dir: str, backup_dir: str, snapshot_name: str) -> str:
         """Create a zip backup of the source directory.
 
@@ -30,20 +60,44 @@ class BackupManager:
 
         # Create the backup filename with source directory name
         backup_filename = f"{source_name}_{snapshot_name}.zip"
-        backup_path = os.path.join(backup_dir, backup_filename)
 
-        # Create a zip file
-        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Walk through all files in the source directory
-            for root, _, files in os.walk(source_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    # Calculate the relative path for the zip file
-                    rel_path = os.path.relpath(file_path, source_dir)
-                    # Add the file to the zip
-                    zipf.write(file_path, rel_path)
+        if self.is_s3_path(backup_dir):
+            # Handle S3 backup (placeholder for now)
+            print("Note: S3 backup support is not yet fully implemented")
+            # Create a temporary backup in the parent directory of source_dir
+            source_parent = os.path.dirname(source_dir)
+            temp_dir = os.path.join(source_parent, "temp_backups")
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+            backup_path = os.path.join(temp_dir, backup_filename)
+            s3_path = f"{backup_dir}/{backup_filename}"
 
-        return backup_path
+            # Create the zip locally
+            with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, _, files in os.walk(source_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(file_path, source_dir)
+                        zipf.write(file_path, rel_path)
+
+            print(f"Would upload {backup_path} to {s3_path}")
+            return s3_path
+        else:
+            # Local backup path
+            backup_path = os.path.join(backup_dir, backup_filename)
+
+            # Create a zip file
+            with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Walk through all files in the source directory
+                for root, _, files in os.walk(source_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # Calculate the relative path for the zip file
+                        rel_path = os.path.relpath(file_path, source_dir)
+                        # Add the file to the zip
+                        zipf.write(file_path, rel_path)
+
+            return backup_path
 
     def list_snapshots(self, backup_dir: str, source_name: str) -> List[Tuple[str, str, Optional[str]]]:
         """List all snapshots for a specific game.
@@ -57,6 +111,11 @@ class BackupManager:
         """
         snapshots = []
         prefix = f"{source_name}_"
+
+        if self.is_s3_path(backup_dir):
+            # Placeholder for S3 snapshot listing
+            print("Note: S3 snapshot listing is not yet fully implemented")
+            return snapshots
 
         if not os.path.exists(backup_dir):
             return snapshots
@@ -97,7 +156,18 @@ class BackupManager:
         if not os.path.exists(save_dir):
             return False, f"Save directory '{save_dir}' does not exist."
 
-        # Create backup directory if it doesn't exist
+        # Handle S3 backup directory
+        if self.is_s3_path(backup_dir):
+            bucket_name, key_prefix = self.parse_s3_path(backup_dir)
+            if not bucket_name:
+                return False, "Invalid S3 URL format. Expected: s3://bucket-name/optional/path"
+
+            # For now, we just validate the format and accept it
+            # In a full implementation, you'd verify bucket existence and permissions
+            print(f"Note: S3 backup location '{bucket_name}/{key_prefix}' will be used (validation skipped)")
+            return True, None
+
+        # Create local backup directory if it doesn't exist
         if not os.path.exists(backup_dir):
             try:
                 os.makedirs(backup_dir)

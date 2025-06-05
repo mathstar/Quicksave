@@ -50,7 +50,12 @@ def main():
         if args.command == 'register':
             # Validate directories
             save_dir = os.path.abspath(args.save_dir)
-            backup_dir = os.path.abspath(args.backup_dir)
+
+            # Handle backup_dir - preserve S3 URL format if present
+            if args.backup_dir.startswith('s3://'):
+                backup_dir = args.backup_dir
+            else:
+                backup_dir = os.path.abspath(args.backup_dir)
 
             # Verify directories
             success, error_message = backup_manager.verify_directories(save_dir, backup_dir)
