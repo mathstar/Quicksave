@@ -23,10 +23,14 @@ register_parser.add_argument('-a', '--alias', action='append', help='Alias for t
 
 # Update command
 update_parser = subparsers.add_parser('update', help='Update an existing game configuration')
-update_parser.add_argument('-n', '--name', required=True, help='Name of the game to update')
+update_parser.add_argument('game', help='Name or alias of the game to update')
 update_parser.add_argument('-s', '--save-dir', help='New path to the save directory')
 update_parser.add_argument('-b', '--backup-dir', help='New path to the backup directory')
 update_parser.add_argument('-a', '--alias', action='append', help='Aliases to add (can be used multiple times)')
+
+# Unregister command
+unregister_parser = subparsers.add_parser('unregister', help='Remove a game from configuration')
+unregister_parser.add_argument('game', help='Name of the game to unregister')
 
 # Save command
 save_parser = subparsers.add_parser('save', help='Save a snapshot of the registered game save')
@@ -83,9 +87,9 @@ def main():
 
         elif args.command == 'update':
             # Get game info
-            game_info = config.get_game(args.name)
+            game_info = config.get_game(args.game)
             if not game_info:
-                print(f"Error: Game '{args.name}' not found.")
+                print(f"Error: Game '{args.game}' not found.")
                 return
 
             # Update save directory if provided
@@ -108,14 +112,25 @@ def main():
                 game_info["aliases"] = aliases
 
             # Save updated game info
-            config.update_game(args.name, game_info)
-            print(f"Updated game: {args.name}")
-            if args.save_dir:
-                print(f"New save directory: {save_dir}")
-            if args.backup_dir:
-                print(f"New backup directory: {backup_dir}")
-            if args.alias:
-                print(f"Updated aliases: {', '.join(args.alias)}")
+            success = config.update_game(args.game, game_info)
+            if success:
+                print(f"Updated game: {args.game}")
+                if args.save_dir:
+                    print(f"New save directory: {save_dir}")
+                if args.backup_dir:
+                    print(f"New backup directory: {backup_dir}")
+                if args.alias:
+                    print(f"Added aliases: {', '.join(args.alias)}")
+            else:
+                print(f"Error: Failed to update game '{args.game}'.")
+
+        elif args.command == 'unregister':
+            # Remove game configuration
+            success = config.remove_game(args.game)
+            if success:
+                print(f"Unregistered game: {args.game}")
+            else:
+                print(f"Error: Game '{args.game}' not found.")
 
         elif args.command == 'save':
             # Get game info

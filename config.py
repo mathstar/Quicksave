@@ -129,20 +129,60 @@ class Config:
 
         return True
 
-    def update_game(self, name: str, game_info: dict) -> None:
+    def update_game(self, name_or_alias: str, game_info: dict) -> bool:
         """Update an existing game's configuration.
 
         Args:
-            name: Name of the game to update
+            name_or_alias: Name or alias of the game to update
             game_info: Updated game information dictionary
+
+        Returns:
+            bool: True if the game was found and updated, False otherwise
         """
         if "games" not in self.config:
             self.config["games"] = {}
 
-        if name not in self.config["games"]:
-            raise ValueError(f"Game '{name}' not found in configuration")
+        # Direct name lookup
+        if name_or_alias in self.config["games"]:
+            # Update the game configuration
+            self.config["games"][name_or_alias] = game_info
+            self.save()
+            return True
 
-        # Update the game configuration
-        self.config["games"][name] = game_info
-        self.save()
+        # Check aliases
+        for name, existing_game_info in self.config["games"].items():
+            aliases = existing_game_info.get("aliases", [])
+            if isinstance(aliases, list) and name_or_alias in aliases:
+                # Update the game configuration
+                self.config["games"][name] = game_info
+                self.save()
+                return True
 
+        return False
+
+    def remove_game(self, name_or_alias: str) -> bool:
+        """Remove a game from configuration by name or alias.
+
+        Args:
+            name_or_alias: Name or alias of the game to remove
+
+        Returns:
+            bool: True if the game was found and removed, False otherwise
+        """
+        games = self.get_games()
+
+        # Direct name lookup
+        if name_or_alias in games:
+            del self.config["games"][name_or_alias]
+            self.save()
+            return True
+
+        # Check aliases
+        for name, game_info in list(games.items()):
+            aliases = game_info.get("aliases", [])
+            if isinstance(aliases, list) and name_or_alias in aliases:
+                del self.config["games"][name]
+                self.save()
+                return True
+
+        return False
