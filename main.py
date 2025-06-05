@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from config import Config
+from backup_manager import BackupManager
 import os
 import datetime
 
@@ -36,8 +37,8 @@ def main():
     # Parse command line arguments
     args = argument_parser.parse_args()
 
-    # Create config manager
     config = Config()
+    backup_manager = BackupManager()
 
     # Handle version flag if present
     if hasattr(args, 'version') and args.version:
@@ -51,17 +52,11 @@ def main():
             save_dir = os.path.abspath(args.save_dir)
             backup_dir = os.path.abspath(args.backup_dir)
 
-            if not os.path.exists(save_dir):
-                print(f"Error: Save directory '{save_dir}' does not exist.")
+            # Verify directories
+            success, error_message = backup_manager.verify_directories(save_dir, backup_dir)
+            if not success:
+                print(error_message)
                 return
-
-            # Create backup directory if it doesn't exist
-            if not os.path.exists(backup_dir):
-                try:
-                    os.makedirs(backup_dir)
-                except OSError as e:
-                    print(f"Error creating backup directory: {e}")
-                    return
 
             # Register the game
             config.add_game(args.name, save_dir, backup_dir, args.alias)
@@ -78,6 +73,15 @@ def main():
                 print(f"Error: Game '{args.game}' not found.")
                 return
 
+            # Extract directories from game info
+            save_dir = game_info.get("save_dir")
+            backup_dir = game_info.get("backup_dir")
+
+            # Make sure save directory exists
+            if not os.path.exists(save_dir):
+                print(f"Error: Save directory '{save_dir}' doesn't exist.")
+                return
+
             # Create timestamp for snapshot
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             if args.tag:
@@ -85,10 +89,16 @@ def main():
             else:
                 snapshot_name = timestamp
 
-            # Here you would implement the actual backup functionality
-            print(f"Saving snapshot for game: {args.game}")
-            if args.tag:
-                print(f"Using tag: {args.tag}")
+            try:
+                # Create the backup
+                backup_path = backup_manager.create_backup(save_dir, backup_dir, snapshot_name)
+                print(f"Saving snapshot for game: {args.game}")
+                if args.tag:
+                    print(f"Using tag: {args.tag}")
+                print(f"Snapshot saved to: {backup_path}")
+            except Exception as e:
+                print(f"Error creating backup: {e}")
+                return
 
         elif args.command == 'list':
             games = config.get_games()
@@ -112,12 +122,25 @@ def main():
                 print(f"Error: Game '{args.game}' not found.")
                 return
 
-            # Here you would implement functionality to list snapshots
+            # Extract directories from game info
+            save_dir = game_info.get("save_dir")
+            backup_dir = game_info.get("backup_dir")
+            source_name = os.path.basename(save_dir)
+
+            # Get list of snapshots
+            snapshots = backup_manager.list_snapshots(backup_dir, source_name)
+
+            if not snapshots:
+                print(f"No snapshots found for game: {args.game}")
+                return
+
             print(f"Snapshots for game: {args.game}")
-            # This would be populated from actual storage in a real implementation
-            print("- 2025-06-01_12-30-45")
-            print("- 2025-06-02_08-15-22_boss-fight")
-            print("- 2025-06-04_19-45-10_before-final-quest")
+            for snapshot in snapshots:
+                filename, timestamp, tag = snapshot
+                if tag:
+                    print(f"- {timestamp} (tag: {tag})")
+                else:
+                    print(f"- {timestamp}")
 
 if __name__ == "__main__":
     main()
