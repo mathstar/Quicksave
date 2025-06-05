@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from config import Config
 from backup_manager import BackupManager
+from version import __version__
 import os
 import datetime
 import copy
@@ -57,7 +58,7 @@ def main():
 
     # Handle version flag if present
     if hasattr(args, 'version') and args.version:
-        print("quicksave version 0.1.0")
+        print(f"quicksave version {__version__}")
         return
 
     # Handle commands

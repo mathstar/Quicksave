@@ -3,6 +3,7 @@ import os
 import tempfile
 import shutil
 from pathlib import Path
+from version import __version__
 
 # Import the Config class
 from config import Config
@@ -35,7 +36,7 @@ class TestConfig(unittest.TestCase):
         self.assertIsInstance(self.config.config, dict)
         self.assertIn("version", self.config.config)
         self.assertIn("games", self.config.config)
-        self.assertEqual(self.config.config["version"], "0.1.0")
+        self.assertEqual(self.config.config["version"], __version__)
         self.assertIsInstance(self.config.config["games"], dict)
 
     def test_add_game(self):

@@ -2,6 +2,7 @@ import os
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
+from version import __version__
 
 
 class Config:
@@ -41,7 +42,7 @@ class Config:
         if not self.config_file.exists():
             # Create a default config if none exists
             default_config = {
-                "version": "0.1.0",
+                "version": __version__,
                 "games": {}
             }
             self._save_config(default_config)
@@ -52,7 +53,7 @@ class Config:
                 return yaml.safe_load(file) or {}
             except yaml.YAMLError:
                 # If the file is corrupted, return an empty config
-                return {"version": "0.1.0", "games": {}}
+                return {"version": __version__, "games": {}}
 
     def _save_config(self, config: Dict[str, Any]) -> None:
         """Save configuration to the YAML file."""
