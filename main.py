@@ -7,7 +7,6 @@ import copy
 
 argument_parser = ArgumentParser(
     prog="quicksave",
-    usage="quicksave [-h] [--version]",
     description="A command line tool for saving snapshots of game saves.",
 )
 argument_parser.add_argument('--version', action='store_true', help='show program version')
