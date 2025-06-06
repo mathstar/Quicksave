@@ -3,6 +3,7 @@ from .config import Config
 from .backup_manager import BackupManager
 from .version import __version__
 import os
+import sys
 import datetime
 import copy
 
@@ -50,6 +51,11 @@ show_parser.add_argument('game', help='Name or alias of the game to show snapsho
 show_parser.add_argument('-b', '--backup-dir', help='Override the backup directory for listing snapshots')
 
 def main():
+    # Handle no arguments case - print usage and exit
+    if len(sys.argv) == 1:
+        argument_parser.print_help()
+        return
+
     # Parse command line arguments
     args = argument_parser.parse_args()
 
