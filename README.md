@@ -14,7 +14,7 @@ Quicksave is a command line tool for saving snapshots of game saves. It helps ga
 Quicksave requires Python 3.13 or later.
 
 ```bash
-pip install quicksave
+pip install quicksave-tool
 ```
 
 ## Usage
