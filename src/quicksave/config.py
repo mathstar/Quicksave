@@ -2,7 +2,7 @@ import os
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
-from version import __version__
+from .version import __version__
 
 
 class Config:

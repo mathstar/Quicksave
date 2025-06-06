@@ -6,7 +6,7 @@ import zipfile
 from unittest.mock import patch, MagicMock
 
 # Import the BackupManager class
-from backup_manager import BackupManager
+from quicksave.backup_manager import BackupManager
 
 
 class TestBackupManager(unittest.TestCase):

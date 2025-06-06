@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
-from config import Config
-from backup_manager import BackupManager
-from version import __version__
+from .config import Config
+from .backup_manager import BackupManager
+from .version import __version__
 import os
 import datetime
 import copy
@@ -10,7 +10,7 @@ argument_parser = ArgumentParser(
     prog="quicksave",
     description="A command line tool for saving snapshots of game saves.",
 )
-argument_parser.add_argument('--version', action='store_true', help='show program version')
+argument_parser.add_argument('-v', '--version', action='store_true', help='show program version')
 
 # Add subparsers for commands
 subparsers = argument_parser.add_subparsers(dest='command', help='Commands')

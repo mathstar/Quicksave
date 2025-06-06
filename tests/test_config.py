@@ -3,10 +3,10 @@ import os
 import tempfile
 import shutil
 from pathlib import Path
-from version import __version__
 
 # Import the Config class
-from config import Config
+from quicksave.config import Config
+from quicksave import __version__
 
 
 class TestConfig(unittest.TestCase):
