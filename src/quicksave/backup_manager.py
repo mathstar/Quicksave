@@ -1,6 +1,8 @@
 import os
 import zipfile
 import pathlib
+import stat
+
 import boto3
 import botocore.exceptions
 from typing import List, Tuple, Optional
@@ -77,10 +79,31 @@ class BackupManager:
             remaining_files = [f for f in os.listdir(temp_dir) if not f.startswith('.')]
 
             if not remaining_files:
-                os.rmdir(temp_dir)
-                print(f"Removed empty temporary directory: {temp_dir}")
+                try:
+                    os.rmdir(temp_dir)
+                    print(f"Removed empty temporary directory: {temp_dir}")
+                except OSError as e:
+                    # Special handling for OneDrive directories
+                    if "OneDrive" in temp_dir and "Access is denied" in str(e):
+                        print(f"OneDrive directory detected, attempting to clear read-only attribute on {temp_dir}")
+                        try:
+                            # Get current mode
+                            mode = os.stat(temp_dir).st_mode
+                            # Clear the read-only bit and set write permission
+                            os.chmod(temp_dir, mode | stat.S_IWUSR)
+
+                            # Try removing again
+                            try:
+                                os.rmdir(temp_dir)
+                                print(f"Successfully removed OneDrive directory after clearing attributes: {temp_dir}")
+                            except OSError as e2:
+                                print(f"Warning: Still could not remove temporary directory {temp_dir} after clearing attributes: {e2}")
+                        except OSError as chmod_error:
+                            print(f"Warning: Could not modify directory permissions: {chmod_error}")
+                    else:
+                        print(f"Warning: Could not remove temporary directory {temp_dir}: {e}")
         except OSError as e:
-            print(f"Warning: Could not remove temporary directory {temp_dir}: {e}")
+            print(f"Warning: Could not check temporary directory {temp_dir}: {e}")
 
     def create_backup(self, source_dir: str, backup_dir: str, snapshot_name: str) -> str:
         """Create a zip backup of the source directory.

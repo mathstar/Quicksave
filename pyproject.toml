@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quicksave-tool"
-version = "0.1.0"
+version = "0.1.1"
 description = "A command line tool for saving snapshots of game saves"
 requires-python = ">=3.13"
 dependencies = [
